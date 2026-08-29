@@ -1,0 +1,137 @@
+// Esquema de datos de Moneyflow
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Un periodo de finanzas. No es un mes calendario: tiene fechas editables
+/// (ej. del 31 de agosto al 25 de septiembre).
+model Period {
+  id              Int            @id @default(autoincrement())
+  label           String
+  startDate       DateTime       @db.Date
+  endDate         DateTime       @db.Date
+  transitDiscount Decimal        @default(0) @db.Decimal(10, 2)
+  createdAt       DateTime       @default(now())
+
+  incomes         Income[]
+  subscriptions   Subscription[]
+  expenses        Expense[]
+  routeCosts      RouteCost[]
+  weeks           TransitWeek[]
+
+  @@map("periods")
+}
+
+/// Cada pago de sueldo. El sueldo es quincenal, así que hay 2+ por periodo,
+/// cada uno con su propio monto (275, 250, 300, etc.).
+model Income {
+  id        Int      @id @default(autoincrement())
+  periodId  Int
+  period    Period   @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  label     String   @default("")
+  amount    Decimal  @default(0) @db.Decimal(10, 2)
+  date      DateTime? @db.Date
+
+  @@index([periodId])
+  @@map("incomes")
+}
+
+/// Cargos recurrentes del periodo (ej. Claude 88.31).
+model Subscription {
+  id        Int      @id @default(autoincrement())
+  periodId  Int
+  period    Period   @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  name      String   @default("")
+  amount    Decimal  @default(0) @db.Decimal(10, 2)
+
+  @@index([periodId])
+  @@map("subscriptions")
+}
+
+enum Category {
+  COMIDA
+  SERVICIOS
+  OCIO
+  SALUD
+  OTROS
+}
+
+/// Gastos varios clasificados por categoría.
+model Expense {
+  id          Int       @id @default(autoincrement())
+  periodId    Int
+  period      Period    @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  category    Category  @default(OTROS)
+  description String    @default("")
+  amount      Decimal   @default(0) @db.Decimal(10, 2)
+  date        DateTime? @db.Date
+
+  @@index([periodId])
+  @@map("expenses")
+}
+
+/// Costo de cada ruta (tren/bus) para este periodo. Los costos pueden variar
+/// entre periodos, por eso se guardan por periodo.
+model RouteCost {
+  id        Int     @id @default(autoincrement())
+  periodId  Int
+  period    Period  @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  routeKey  String
+  label     String
+  cost      Decimal @default(0) @db.Decimal(10, 2)
+
+  @@unique([periodId, routeKey])
+  @@index([periodId])
+  @@map("route_costs")
+}
+
+/// Una semana de pasajes dentro del periodo, con fechas editables.
+model TransitWeek {
+  id         Int          @id @default(autoincrement())
+  periodId   Int
+  period     Period       @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  label      String       @default("")
+  startDate  DateTime?    @db.Date
+  endDate    DateTime?    @db.Date
+  orderIndex Int          @default(0)
+
+  days       TransitDay[]
+
+  @@index([periodId])
+  @@map("transit_weeks")
+}
+
+/// Un día (columna) dentro de una semana de pasajes. La etiqueta es libre
+/// (ej. "Lunes 31", "Sábado 12") porque los días varían.
+model TransitDay {
+  id         Int           @id @default(autoincrement())
+  weekId     Int
+  week       TransitWeek   @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  label      String        @default("")
+  orderIndex Int           @default(0)
+
+  marks      TransitMark[]
+
+  @@index([weekId])
+  @@map("transit_days")
+}
+
+/// Marca de que una ruta se usó ese día (un checkbox de la grilla).
+model TransitMark {
+  id       Int        @id @default(autoincrement())
+  dayId    Int
+  day      TransitDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  routeKey String
+  used     Boolean    @default(false)
+
+  @@unique([dayId, routeKey])
+  @@index([dayId])
+  @@map("transit_marks")
+}
