@@ -1,39 +1,43 @@
 import { useRef, useState } from "react";
 
-export default function DataTools({ onExportPeriod, onExportAll, onImport }) {
+export default function DataTools({ onSavePeriod, onSaveAll, onImport }) {
   const fileRef = useRef(null);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function handleFile(e) {
-    const file = e.target.files && e.target.files[0];
-    e.target.value = ""; // permite re-subir el mismo archivo
-    if (!file) return;
+  async function run(fn, okPrefix) {
     setBusy(true);
-    setMsg("Importando…");
+    setMsg("Procesando…");
     try {
-      const name = await onImport(file);
-      setMsg(`Importado: ${name}`);
+      const result = await fn();
+      setMsg(okPrefix + result);
     } catch (err) {
-      setMsg("Error: " + (err.message || "no se pudo importar"));
+      setMsg("Error: " + (err.message || "no se pudo completar"));
     } finally {
       setBusy(false);
     }
+  }
+
+  async function handleFile(e) {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    await run(() => onImport(file), "Importado: ");
   }
 
   return (
     <div className="card">
       <h2 style={{ fontSize: "1.1rem", marginBottom: "4px" }}>Excel</h2>
       <div className="sub" style={{ marginBottom: "12px" }}>
-        exportá para respaldo o importá un periodo
+        se guardan en tu carpeta Moneyflowexcels
       </div>
 
       <div className="data-tools">
-        <button className="icon-btn" onClick={onExportPeriod}>
-          ⬇ Exportar este periodo
+        <button className="icon-btn" disabled={busy} onClick={() => run(onSavePeriod, "Guardado en: ")}>
+          ⬇ Guardar este periodo
         </button>
-        <button className="icon-btn" onClick={onExportAll}>
-          ⬇ Exportar todos (resumen)
+        <button className="icon-btn" disabled={busy} onClick={() => run(onSaveAll, "Guardado en: ")}>
+          ⬇ Guardar todos (resumen)
         </button>
         <button className="icon-btn" disabled={busy} onClick={() => fileRef.current.click()}>
           ⬆ Importar periodo

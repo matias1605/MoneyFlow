@@ -55,6 +55,8 @@ export const api = {
   setMark: (dayId, routeKey, used) => req("PUT", "/api/marks", { dayId, routeKey, used }),
 
   // Excel
+  savePeriodExcel: (id) => req("POST", `/api/periods/${id}/save-excel`),
+  saveAllExcel: () => req("POST", `/api/save-excel`),
   exportPeriodUrl: (id) => `/api/periods/${id}/export`,
   exportAllUrl: () => `/api/export`,
   importExcel: async (file) => {

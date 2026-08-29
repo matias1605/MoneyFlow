@@ -1,5 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
+import fs from "fs";
+import path from "path";
 import { prisma } from "../db.js";
 import { PERIOD_INCLUDE, serializePeriod, parseDate } from "../utils.js";
 import {
@@ -13,35 +15,73 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 *
 
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-// Nombre de archivo seguro (sin acentos ni caracteres raros).
-function safeName(s) {
-  return String(s || "moneyflow")
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^A-Za-z0-9 _-]/g, "")
-    .trim()
-    .replace(/\s+/g, "_") || "moneyflow";
+// Carpeta destino de los Excel exportados (configurable por EXPORT_DIR).
+const EXPORT_DIR = process.env.EXPORT_DIR || "C:\\Users\\Matias\\Documents\\Moneyflowexcels";
+
+function ensureExportDir() {
+  fs.mkdirSync(EXPORT_DIR, { recursive: true });
+  return EXPORT_DIR;
 }
 
-// GET /api/periods/:id/export  -> descarga un periodo como .xlsx
-router.get("/periods/:id/export", async (req, res) => {
+// Nombre de archivo seguro (sin acentos ni caracteres raros).
+function safeName(s) {
+  return (
+    String(s || "moneyflow")
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^A-Za-z0-9 _-]/g, "")
+      .trim()
+      .replace(/\s+/g, "_") || "moneyflow"
+  );
+}
+
+// ---- Guardar en disco (en la carpeta EXPORT_DIR) ----
+
+// POST /api/periods/:id/save-excel  -> escribe el .xlsx del periodo y devuelve la ruta
+router.post("/periods/:id/save-excel", async (req, res) => {
   const period = await prisma.period.findUnique({
     where: { id: Number(req.params.id) },
     include: PERIOD_INCLUDE,
   });
   if (!period) return res.status(404).json({ error: "Periodo no encontrado" });
 
+  const dir = ensureExportDir();
+  const file = path.join(dir, `Moneyflow_${safeName(period.label)}.xlsx`);
+  const wb = buildPeriodWorkbook(period);
+  await wb.xlsx.writeFile(file);
+  res.json({ path: file });
+});
+
+// POST /api/save-excel  -> escribe el resumen de todos los periodos
+router.post("/save-excel", async (_req, res) => {
+  const periods = await prisma.period.findMany({
+    orderBy: { startDate: "asc" },
+    include: PERIOD_INCLUDE,
+  });
+  const dir = ensureExportDir();
+  const file = path.join(dir, "Moneyflow_todos_los_periodos.xlsx");
+  const wb = buildAllPeriodsWorkbook(periods);
+  await wb.xlsx.writeFile(file);
+  res.json({ path: file });
+});
+
+// ---- Descarga directa (fallback, por navegador) ----
+
+// GET /api/periods/:id/export
+router.get("/periods/:id/export", async (req, res) => {
+  const period = await prisma.period.findUnique({
+    where: { id: Number(req.params.id) },
+    include: PERIOD_INCLUDE,
+  });
+  if (!period) return res.status(404).json({ error: "Periodo no encontrado" });
   const wb = buildPeriodWorkbook(period);
   res.setHeader("Content-Type", XLSX_MIME);
-  res.setHeader(
-    "Content-Disposition",
-    `attachment; filename="Moneyflow_${safeName(period.label)}.xlsx"`
-  );
+  res.setHeader("Content-Disposition", `attachment; filename="Moneyflow_${safeName(period.label)}.xlsx"`);
   await wb.xlsx.write(res);
   res.end();
 });
 
-// GET /api/export  -> descarga el resumen de todos los periodos
+// GET /api/export
 router.get("/export", async (_req, res) => {
   const periods = await prisma.period.findMany({
     orderBy: { startDate: "asc" },
@@ -53,6 +93,8 @@ router.get("/export", async (_req, res) => {
   await wb.xlsx.write(res);
   res.end();
 });
+
+// ---- Importar ----
 
 // POST /api/import  -> sube un .xlsx (campo "file") y crea un periodo nuevo
 router.post("/import", upload.single("file"), async (req, res) => {
@@ -79,10 +121,7 @@ router.post("/import", upload.single("file"), async (req, res) => {
         })),
       },
       subscriptions: {
-        create: parsed.subscriptions.map((s) => ({
-          name: s.name,
-          amount: Number(s.amount) || 0,
-        })),
+        create: parsed.subscriptions.map((s) => ({ name: s.name, amount: Number(s.amount) || 0 })),
       },
       expenses: {
         create: parsed.expenses.map((e) => ({
@@ -109,9 +148,7 @@ router.post("/import", upload.single("file"), async (req, res) => {
             create: w.days.map((d) => ({
               label: d.label,
               orderIndex: d.orderIndex,
-              marks: {
-                create: d.marks.map((m) => ({ routeKey: m.routeKey, used: true })),
-              },
+              marks: { create: d.marks.map((m) => ({ routeKey: m.routeKey, used: true })) },
             })),
           },
         })),

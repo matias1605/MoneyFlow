@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api, downloadFile } from "./api.js";
+import { api } from "./api.js";
 import { computeSummary } from "./lib/format.js";
 
 import MonthNav from "./components/MonthNav.jsx";
@@ -261,11 +261,13 @@ export default function App() {
   }
 
   // ---- Excel ----
-  function exportPeriod() {
-    if (currentId) downloadFile(api.exportPeriodUrl(currentId));
+  async function savePeriodExcel() {
+    const r = await api.savePeriodExcel(currentId);
+    return r.path;
   }
-  function exportAll() {
-    downloadFile(api.exportAllUrl());
+  async function saveAllExcel() {
+    const r = await api.saveAllExcel();
+    return r.path;
   }
   async function importExcel(file) {
     const created = await api.importExcel(file);
@@ -351,8 +353,8 @@ export default function App() {
                 onSelect={openPeriod}
               />
               <DataTools
-                onExportPeriod={exportPeriod}
-                onExportAll={exportAll}
+                onSavePeriod={savePeriodExcel}
+                onSaveAll={saveAllExcel}
                 onImport={importExcel}
               />
             </div>

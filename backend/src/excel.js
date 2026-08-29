@@ -1,24 +1,28 @@
 // Generación y lectura de archivos Excel (.xlsx) para Moneyflow.
-// El formato de exportación de un periodo es "ida y vuelta": el mismo archivo
-// puede volver a importarse.
+// Formato PROFESIONAL inspirado en la planilla original del usuario: grillas
+// semanales (rutas x días) con colores, bloque de resumen, y tablas de
+// ingresos / suscripciones / gastos. El MISMO formato sirve para exportar e
+// importar (ida y vuelta).
 import ExcelJS from "exceljs";
 import { computeSummary, toNum, dateStr } from "./utils.js";
 
-// Categoría (enum interno) <-> etiqueta legible en el Excel.
-const CAT_TO_LABEL = {
-  COMIDA: "Comida",
-  SERVICIOS: "Servicios",
-  OCIO: "Ocio",
-  SALUD: "Salud",
-  OTROS: "Otros",
+// ---- paleta (similar a la planilla original) ----
+const C = {
+  yellow: "FFFFF000",
+  blue: "FF4FC3E8",
+  greenTotal: "FF9CD69A",
+  headGrey: "FFDCE3D6",
+  pink: "FFE6B8D9",
+  red: "FFE05a4f",
+  greenOk: "FF9CD69A",
+  soft: "FFF1F4EE",
+  line: "FFB9C4B3",
 };
-const LABEL_TO_CAT = {
-  comida: "COMIDA",
-  servicios: "SERVICIOS",
-  ocio: "OCIO",
-  salud: "SALUD",
-  otros: "OTROS",
-};
+const MONEY = '"S/ "#,##0.00';
+
+// Categoría (enum) <-> etiqueta legible.
+const CAT_TO_LABEL = { COMIDA: "Comida", SERVICIOS: "Servicios", OCIO: "Ocio", SALUD: "Salud", OTROS: "Otros" };
+const LABEL_TO_CAT = { comida: "COMIDA", servicios: "SERVICIOS", ocio: "OCIO", salud: "SALUD", otros: "OTROS" };
 function labelToCat(v) {
   const k = String(v || "").trim().toLowerCase();
   if (LABEL_TO_CAT[k]) return LABEL_TO_CAT[k];
@@ -26,195 +30,394 @@ function labelToCat(v) {
   return CAT_TO_LABEL[up] ? up : "OTROS";
 }
 
-const MONEY_FMT = '"S/ "#,##0.00';
+// Rutas que se pintan de amarillo (tren); el resto va celeste (bus).
+const TREN_KEYS = new Set(["trenIda", "trenVuelta"]);
 
-function styleHeader(row) {
-  row.font = { bold: true };
-  row.eachCell((c) => {
-    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE3E8DE" } };
-    c.border = { bottom: { style: "thin", color: { argb: "FFB9C4B3" } } };
-  });
+function fill(cell, argb) {
+  cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb } };
+}
+function box(cell) {
+  cell.border = {
+    top: { style: "thin", color: { argb: C.line } },
+    bottom: { style: "thin", color: { argb: C.line } },
+    left: { style: "thin", color: { argb: C.line } },
+    right: { style: "thin", color: { argb: C.line } },
+  };
 }
 
-// ---------- EXPORT: un periodo completo (ida y vuelta) ----------
+// Suma bruta de pasajes (sin restar descuento).
+function grossPasajes(p) {
+  const costMap = {};
+  (p.routeCosts || []).forEach((rc) => (costMap[rc.routeKey] = toNum(rc.cost)));
+  let total = 0;
+  (p.weeks || []).forEach((w) =>
+    (w.days || []).forEach((d) =>
+      (d.marks || []).forEach((m) => {
+        if (m.used) total += costMap[m.routeKey] || 0;
+      })
+    )
+  );
+  return total;
+}
+
+// ============================================================
+//  EXPORT: un periodo completo (profesional, ida y vuelta)
+// ============================================================
 export function buildPeriodWorkbook(p) {
   const wb = new ExcelJS.Workbook();
   wb.creator = "Moneyflow";
   wb.created = new Date();
 
-  const summary = computeSummary(p);
+  buildPeriodoSheet(wb, p);
+  buildTableSheet(wb, "Ingresos", [
+    { h: "Etiqueta", w: 24 },
+    { h: "Fecha", w: 14 },
+    { h: "Monto", w: 14, money: true },
+  ], (p.incomes || []).map((i) => [i.label, dateStr(i.date) || "", toNum(i.amount)]));
 
-  // Hoja Periodo (meta + resumen). Las 4 primeras filas se leen al importar.
-  const meta = wb.addWorksheet("Periodo");
-  meta.columns = [
-    { header: "Clave", key: "k", width: 22 },
-    { header: "Valor", key: "v", width: 30 },
-  ];
-  styleHeader(meta.getRow(1));
-  meta.addRow({ k: "Etiqueta", v: p.label });
-  meta.addRow({ k: "Fecha inicio", v: dateStr(p.startDate) || "" });
-  meta.addRow({ k: "Fecha fin", v: dateStr(p.endDate) || "" });
-  meta.addRow({ k: "Descuento pasajes", v: toNum(p.transitDiscount) });
-  meta.addRow({ k: "", v: "" });
-  const sTitle = meta.addRow({ k: "RESUMEN (solo lectura)", v: "" });
-  sTitle.font = { bold: true, italic: true };
-  const addSum = (label, val) => {
-    const r = meta.addRow({ k: label, v: val });
-    r.getCell("v").numFmt = MONEY_FMT;
-  };
-  addSum("Ingresos", summary.ingresos);
-  addSum("Gastos", summary.gastos);
-  addSum("Saldo", summary.saldo);
-  addSum("Pasajes", summary.byCat.pasajes);
-  addSum("Suscripciones", summary.byCat.subscripciones);
-  addSum("Comida", summary.byCat.comida);
-  addSum("Servicios", summary.byCat.servicios);
-  addSum("Ocio", summary.byCat.ocio);
-  addSum("Salud", summary.byCat.salud);
-  addSum("Otros", summary.byCat.otros);
+  buildTableSheet(wb, "Suscripciones", [
+    { h: "Nombre", w: 24 },
+    { h: "Monto", w: 14, money: true },
+  ], (p.subscriptions || []).map((s) => [s.name, toNum(s.amount)]));
 
-  // Hoja Ingresos
-  const ing = wb.addWorksheet("Ingresos");
-  ing.columns = [
-    { header: "Etiqueta", key: "label", width: 24 },
-    { header: "Fecha", key: "date", width: 14 },
-    { header: "Monto", key: "amount", width: 14, style: { numFmt: MONEY_FMT } },
-  ];
-  styleHeader(ing.getRow(1));
-  (p.incomes || []).forEach((i) =>
-    ing.addRow({ label: i.label, date: dateStr(i.date) || "", amount: toNum(i.amount) })
-  );
+  buildTableSheet(wb, "Gastos", [
+    { h: "Categoria", w: 16 },
+    { h: "Descripcion", w: 32 },
+    { h: "Fecha", w: 14 },
+    { h: "Monto", w: 14, money: true },
+  ], (p.expenses || []).map((e) => [
+    CAT_TO_LABEL[e.category] || "Otros",
+    e.description,
+    dateStr(e.date) || "",
+    toNum(e.amount),
+  ]));
 
-  // Hoja Suscripciones
-  const sub = wb.addWorksheet("Suscripciones");
-  sub.columns = [
-    { header: "Nombre", key: "name", width: 24 },
-    { header: "Monto", key: "amount", width: 14, style: { numFmt: MONEY_FMT } },
-  ];
-  styleHeader(sub.getRow(1));
-  (p.subscriptions || []).forEach((s) =>
-    sub.addRow({ name: s.name, amount: toNum(s.amount) })
-  );
-
-  // Hoja Gastos
-  const gas = wb.addWorksheet("Gastos");
-  gas.columns = [
-    { header: "Categoria", key: "cat", width: 16 },
-    { header: "Descripcion", key: "desc", width: 30 },
-    { header: "Fecha", key: "date", width: 14 },
-    { header: "Monto", key: "amount", width: 14, style: { numFmt: MONEY_FMT } },
-  ];
-  styleHeader(gas.getRow(1));
-  (p.expenses || []).forEach((e) =>
-    gas.addRow({
-      cat: CAT_TO_LABEL[e.category] || "Otros",
-      desc: e.description,
-      date: dateStr(e.date) || "",
-      amount: toNum(e.amount),
-    })
-  );
-
-  // Hoja PasajesCostos
-  const rc = wb.addWorksheet("PasajesCostos");
-  rc.columns = [
-    { header: "RutaClave", key: "key", width: 14 },
-    { header: "RutaNombre", key: "label", width: 18 },
-    { header: "Costo", key: "cost", width: 12, style: { numFmt: MONEY_FMT } },
-  ];
-  styleHeader(rc.getRow(1));
-  (p.routeCosts || []).forEach((r) =>
-    rc.addRow({ key: r.routeKey, label: r.label, cost: toNum(r.cost) })
-  );
-
-  // Hoja PasajesUso: grilla completa (una fila por semana×día×ruta)
-  const use = wb.addWorksheet("PasajesUso");
-  use.columns = [
-    { header: "OrdenSemana", key: "ws", width: 12 },
-    { header: "Semana", key: "wl", width: 16 },
-    { header: "Inicio", key: "ini", width: 14 },
-    { header: "Fin", key: "fin", width: 14 },
-    { header: "OrdenDia", key: "ds", width: 10 },
-    { header: "Dia", key: "dl", width: 16 },
-    { header: "RutaClave", key: "rk", width: 14 },
-    { header: "Usado", key: "used", width: 8 },
-  ];
-  styleHeader(use.getRow(1));
-  const routeKeys = (p.routeCosts || []).map((r) => r.routeKey);
-  (p.weeks || []).forEach((w, wi) => {
-    (w.days || []).forEach((d, di) => {
-      routeKeys.forEach((rk) => {
-        const mark = (d.marks || []).find((m) => m.routeKey === rk);
-        use.addRow({
-          ws: w.orderIndex ?? wi,
-          wl: w.label,
-          ini: dateStr(w.startDate) || "",
-          fin: dateStr(w.endDate) || "",
-          ds: d.orderIndex ?? di,
-          dl: d.label,
-          rk,
-          used: mark && mark.used ? 1 : 0,
-        });
-      });
-    });
-  });
+  buildPasajesSheet(wb, p);
 
   return wb;
 }
 
-// ---------- EXPORT: resumen de todos los periodos ----------
+// ---- Hoja "Periodo": meta (parseable) + resumen visual ----
+function buildPeriodoSheet(wb, p) {
+  const ws = wb.addWorksheet("Periodo", { properties: { defaultColWidth: 16 } });
+  ws.getColumn(1).width = 26;
+  ws.getColumn(2).width = 20;
+  ws.getColumn(3).width = 16;
+
+  const summary = computeSummary(p);
+  const gross = grossPasajes(p);
+  const disc = toNum(p.transitDiscount);
+
+  // Título
+  ws.mergeCells("A1:C1");
+  const title = ws.getCell("A1");
+  title.value = "MONEYFLOW";
+  title.font = { name: "Arial", bold: true, size: 16, color: { argb: "FF1F6F5C" } };
+  ws.getRow(1).height = 22;
+
+  // Meta (estas 4 filas se LEEN al importar: clave en col A, valor en col B)
+  const meta = [
+    ["Etiqueta", p.label],
+    ["Fecha inicio", dateStr(p.startDate) || ""],
+    ["Fecha fin", dateStr(p.endDate) || ""],
+    ["Descuento pasajes", disc],
+  ];
+  let r = 3;
+  meta.forEach(([k, v]) => {
+    const a = ws.getCell(r, 1);
+    a.value = k;
+    a.font = { name: "Arial", bold: true };
+    fill(a, C.headGrey);
+    const b = ws.getCell(r, 2);
+    b.value = v;
+    if (k === "Descuento pasajes") b.numFmt = MONEY;
+    b.font = { name: "Arial" };
+    r++;
+  });
+
+  // Bloque RESUMEN (solo lectura, estilo planilla)
+  r += 1;
+  const secTitle = (row, text, argb) => {
+    const c = ws.getCell(row, 1);
+    c.value = text;
+    c.font = { name: "Arial", bold: true, color: { argb: "FF1F2620" } };
+    fill(c, argb);
+    ws.mergeCells(row, 1, row, 3);
+  };
+  const line = (row, label, value, opts = {}) => {
+    const a = ws.getCell(row, 1);
+    a.value = label;
+    a.font = { name: "Arial", bold: !!opts.bold };
+    const b = ws.getCell(row, 2);
+    b.value = value;
+    b.numFmt = MONEY;
+    b.font = { name: "Arial", bold: !!opts.bold };
+    if (opts.fillC) {
+      fill(a, opts.fillC);
+      fill(b, opts.fillC);
+    }
+  };
+
+  secTitle(r, "RESUMEN DEL PERIODO", C.yellow);
+  r++;
+  line(r++, "Ingresos (quincenas)", summary.ingresos);
+  r++;
+  secTitle(r, "PASAJES", C.pink);
+  r++;
+  line(r++, "Total pasajes (bruto)", gross);
+  line(r++, "Descuento", -disc);
+  line(r++, "Pasajes neto", summary.byCat.pasajes, { bold: true });
+  r++;
+  secTitle(r, "GASTOS", C.pink);
+  r++;
+  line(r++, "Pasajes", summary.byCat.pasajes);
+  line(r++, "Suscripciones", summary.byCat.subscripciones);
+  line(r++, "Comida", summary.byCat.comida);
+  line(r++, "Servicios", summary.byCat.servicios);
+  line(r++, "Ocio", summary.byCat.ocio);
+  line(r++, "Salud", summary.byCat.salud);
+  line(r++, "Otros", summary.byCat.otros);
+  line(r++, "TOTAL GASTOS", summary.gastos, { bold: true, fillC: C.red });
+  r++;
+  line(r++, "SALDO DISPONIBLE", summary.saldo, { bold: true, fillC: C.greenOk });
+}
+
+// ---- Hojas de tabla simples (parseables por encabezado) ----
+function buildTableSheet(wb, name, cols, rows) {
+  const ws = wb.addWorksheet(name);
+  cols.forEach((c, i) => {
+    ws.getColumn(i + 1).width = c.w || 16;
+    if (c.money) ws.getColumn(i + 1).numFmt = MONEY;
+  });
+  const header = ws.getRow(1);
+  cols.forEach((c, i) => {
+    const cell = header.getCell(i + 1);
+    cell.value = c.h;
+    cell.font = { name: "Arial", bold: true };
+    fill(cell, C.headGrey);
+    box(cell);
+  });
+  rows.forEach((row) => {
+    const added = ws.addRow(row);
+    added.eachCell((cell) => (cell.font = { name: "Arial" }));
+  });
+}
+
+// ---- Hoja "Pasajes": costos + grillas semanales (rutas x días) ----
+function buildPasajesSheet(wb, p) {
+  const ws = wb.addWorksheet("Pasajes");
+  ws.getColumn(1).width = 16;
+  ws.getColumn(2).width = 16;
+  for (let c = 3; c <= 12; c++) ws.getColumn(c).width = 12;
+
+  const routes = p.routeCosts || [];
+  const costMap = {};
+  routes.forEach((rc) => (costMap[rc.routeKey] = toNum(rc.cost)));
+
+  // --- Tabla COSTOS POR RUTA (parseable) ---
+  let r = 1;
+  const ct = ws.getCell(r, 1);
+  ct.value = "COSTOS POR RUTA";
+  ct.font = { name: "Arial", bold: true };
+  fill(ct, C.yellow);
+  ws.mergeCells(r, 1, r, 3);
+  r++;
+  ["RutaClave", "RutaNombre", "Costo"].forEach((h, i) => {
+    const cell = ws.getCell(r, i + 1);
+    cell.value = h;
+    cell.font = { name: "Arial", bold: true };
+    fill(cell, C.headGrey);
+    box(cell);
+  });
+  r++;
+  routes.forEach((rc) => {
+    ws.getCell(r, 1).value = rc.routeKey;
+    ws.getCell(r, 2).value = rc.label;
+    const cc = ws.getCell(r, 3);
+    cc.value = toNum(rc.cost);
+    cc.numFmt = MONEY;
+    r++;
+  });
+  r += 1; // fila en blanco
+
+  // --- Grillas por semana ---
+  (p.weeks || []).forEach((w) => {
+    const days = (w.days || []).slice().sort((a, b) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0));
+    const nDays = days.length;
+    const totalCol = 3 + nDays; // C=3 -> primer día
+
+    // Título de semana + fechas (parseable: label en A, inicio en D, fin en F)
+    const tr = ws.getRow(r);
+    const tl = tr.getCell(1);
+    tl.value = w.label || "Semana";
+    tl.font = { name: "Arial", bold: true, size: 12 };
+    if (dateStr(w.startDate)) {
+      tr.getCell(3).value = "Del";
+      tr.getCell(4).value = dateStr(w.startDate);
+      tr.getCell(5).value = "al";
+      tr.getCell(6).value = dateStr(w.endDate) || "";
+      tr.getCell(3).font = tr.getCell(5).font = { name: "Arial", italic: true, color: { argb: "FF7C887E" } };
+    }
+    r++;
+
+    // Encabezado: días + "Total"
+    const hr = ws.getRow(r);
+    days.forEach((d, j) => {
+      const cell = hr.getCell(3 + j);
+      cell.value = d.label;
+      cell.font = { name: "Arial", bold: true };
+      fill(cell, C.headGrey);
+      box(cell);
+      cell.alignment = { horizontal: "center" };
+    });
+    const tcell = hr.getCell(totalCol);
+    tcell.value = "Total";
+    tcell.font = { name: "Arial", bold: true };
+    fill(tcell, C.headGrey);
+    box(tcell);
+    tcell.alignment = { horizontal: "center" };
+    const headerRowNum = r;
+    r++;
+
+    // Filas de ruta
+    routes.forEach((rc) => {
+      const rowNum = r;
+      const rl = ws.getRow(rowNum).getCell(2);
+      rl.value = rc.label;
+      rl.font = { name: "Arial", bold: true };
+      fill(rl, TREN_KEYS.has(rc.routeKey) ? C.yellow : C.blue);
+      box(rl);
+      days.forEach((d, j) => {
+        const used = (d.marks || []).some((m) => m.routeKey === rc.routeKey && m.used);
+        const cell = ws.getRow(rowNum).getCell(3 + j);
+        if (used) {
+          cell.value = costMap[rc.routeKey] || 0;
+          cell.numFmt = MONEY;
+          cell.alignment = { horizontal: "center" };
+        }
+        box(cell);
+      });
+      // total de fila
+      const rowTot = ws.getRow(rowNum).getCell(totalCol);
+      if (nDays > 0) {
+        const first = ws.getRow(rowNum).getCell(3).address;
+        const last = ws.getRow(rowNum).getCell(totalCol - 1).address;
+        rowTot.value = { formula: `SUM(${first}:${last})` };
+      } else {
+        rowTot.value = 0;
+      }
+      rowTot.numFmt = MONEY;
+      box(rowTot);
+      r++;
+    });
+
+    // Fila de totales
+    const totRow = ws.getRow(r);
+    const tLbl = totRow.getCell(2);
+    tLbl.value = "Total";
+    tLbl.font = { name: "Arial", bold: true };
+    fill(tLbl, C.greenTotal);
+    box(tLbl);
+    days.forEach((d, j) => {
+      const col = 3 + j;
+      const cell = totRow.getCell(col);
+      const firstRoute = headerRowNum + 1;
+      const lastRoute = headerRowNum + routes.length;
+      const colLetter = ws.getColumn(col).letter;
+      cell.value = { formula: `SUM(${colLetter}${firstRoute}:${colLetter}${lastRoute})` };
+      cell.numFmt = MONEY;
+      cell.font = { name: "Arial", bold: true };
+      fill(cell, C.greenTotal);
+      box(cell);
+    });
+    const weekTot = totRow.getCell(totalCol);
+    if (nDays > 0) {
+      const colLetter = ws.getColumn(totalCol).letter;
+      const firstRoute = headerRowNum + 1;
+      const lastRoute = headerRowNum + routes.length;
+      weekTot.value = { formula: `SUM(${colLetter}${firstRoute}:${colLetter}${lastRoute})` };
+    } else {
+      weekTot.value = 0;
+    }
+    weekTot.numFmt = MONEY;
+    weekTot.font = { name: "Arial", bold: true };
+    fill(weekTot, C.greenTotal);
+    box(weekTot);
+    r += 2; // separación entre semanas
+  });
+}
+
+// ============================================================
+//  EXPORT: resumen de todos los periodos
+// ============================================================
 export function buildAllPeriodsWorkbook(periods) {
   const wb = new ExcelJS.Workbook();
   wb.creator = "Moneyflow";
   const ws = wb.addWorksheet("Todos los periodos");
-  ws.columns = [
-    { header: "Periodo", key: "label", width: 22 },
-    { header: "Inicio", key: "ini", width: 14 },
-    { header: "Fin", key: "fin", width: 14 },
-    { header: "Ingresos", key: "ing", width: 14, style: { numFmt: MONEY_FMT } },
-    { header: "Gastos", key: "gas", width: 14, style: { numFmt: MONEY_FMT } },
-    { header: "Saldo", key: "sal", width: 14, style: { numFmt: MONEY_FMT } },
-    { header: "Pasajes", key: "pas", width: 12, style: { numFmt: MONEY_FMT } },
-    { header: "Suscripciones", key: "sus", width: 14, style: { numFmt: MONEY_FMT } },
-    { header: "Comida", key: "com", width: 12, style: { numFmt: MONEY_FMT } },
-    { header: "Servicios", key: "ser", width: 12, style: { numFmt: MONEY_FMT } },
-    { header: "Ocio", key: "oci", width: 12, style: { numFmt: MONEY_FMT } },
-    { header: "Salud", key: "sal2", width: 12, style: { numFmt: MONEY_FMT } },
-    { header: "Otros", key: "otr", width: 12, style: { numFmt: MONEY_FMT } },
+  const cols = [
+    { h: "Periodo", w: 22 },
+    { h: "Inicio", w: 14 },
+    { h: "Fin", w: 14 },
+    { h: "Ingresos", w: 14, m: true },
+    { h: "Gastos", w: 14, m: true },
+    { h: "Saldo", w: 14, m: true },
+    { h: "Pasajes", w: 12, m: true },
+    { h: "Suscripciones", w: 14, m: true },
+    { h: "Comida", w: 12, m: true },
+    { h: "Servicios", w: 12, m: true },
+    { h: "Ocio", w: 12, m: true },
+    { h: "Salud", w: 12, m: true },
+    { h: "Otros", w: 12, m: true },
   ];
-  styleHeader(ws.getRow(1));
+  cols.forEach((c, i) => {
+    ws.getColumn(i + 1).width = c.w;
+    if (c.m) ws.getColumn(i + 1).numFmt = MONEY;
+  });
+  const header = ws.getRow(1);
+  cols.forEach((c, i) => {
+    const cell = header.getCell(i + 1);
+    cell.value = c.h;
+    cell.font = { name: "Arial", bold: true };
+    fill(cell, C.yellow);
+    box(cell);
+  });
 
   periods.forEach((p) => {
     const s = computeSummary(p);
-    ws.addRow({
-      label: p.label,
-      ini: dateStr(p.startDate) || "",
-      fin: dateStr(p.endDate) || "",
-      ing: s.ingresos,
-      gas: s.gastos,
-      sal: s.saldo,
-      pas: s.byCat.pasajes,
-      sus: s.byCat.subscripciones,
-      com: s.byCat.comida,
-      ser: s.byCat.servicios,
-      oci: s.byCat.ocio,
-      sal2: s.byCat.salud,
-      otr: s.byCat.otros,
-    });
+    ws.addRow([
+      p.label,
+      dateStr(p.startDate) || "",
+      dateStr(p.endDate) || "",
+      s.ingresos,
+      s.gastos,
+      s.saldo,
+      s.byCat.pasajes,
+      s.byCat.subscripciones,
+      s.byCat.comida,
+      s.byCat.servicios,
+      s.byCat.ocio,
+      s.byCat.salud,
+      s.byCat.otros,
+    ]);
   });
 
-  // Fila de totales
-  const totalRow = ws.addRow({
-    label: "TOTAL",
-    ing: { formula: `SUM(D2:D${periods.length + 1})` },
-    gas: { formula: `SUM(E2:E${periods.length + 1})` },
-    sal: { formula: `SUM(F2:F${periods.length + 1})` },
-  });
+  const totalRow = ws.addRow(["TOTAL"]);
   totalRow.font = { bold: true };
-
+  const n = periods.length;
+  if (n > 0) {
+    ["D", "E", "F", "G", "H", "I", "J", "K", "L", "M"].forEach((col) => {
+      const cell = totalRow.getCell(ws.getColumn(col).number);
+      cell.value = { formula: `SUM(${col}2:${col}${n + 1})` };
+      cell.numFmt = MONEY;
+      cell.font = { bold: true };
+    });
+  }
   return wb;
 }
 
-// ---------- IMPORT: leer un workbook de periodo -> objeto para Prisma ----------
+// ============================================================
+//  IMPORT: leer un workbook de periodo -> objeto para Prisma
+// ============================================================
 export async function parsePeriodWorkbook(buffer) {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buffer);
@@ -224,10 +427,10 @@ export async function parsePeriodWorkbook(buffer) {
     throw new Error("El archivo no tiene la hoja 'Periodo'. ¿Es un Excel exportado por Moneyflow?");
   }
 
-  // Meta: leer pares clave/valor de las primeras filas.
+  // Meta
   const metaMap = {};
   metaSheet.eachRow((row) => {
-    const k = cellText(row.getCell(1));
+    const k = cellStr(row.getCell(1).value);
     const v = row.getCell(2).value;
     if (k) metaMap[k.toLowerCase()] = v;
   });
@@ -241,113 +444,129 @@ export async function parsePeriodWorkbook(buffer) {
     date: cellStr(r.fecha) || null,
     amount: Number(cellNum(r.monto)) || 0,
   }));
-
   const subscriptions = readSheet(wb, "Suscripciones", ["nombre", "monto"]).map((r) => ({
     name: cellStr(r.nombre) || "",
     amount: Number(cellNum(r.monto)) || 0,
   }));
+  const expenses = readSheet(wb, "Gastos", ["categoria", "descripcion", "fecha", "monto"]).map((r) => ({
+    category: labelToCat(cellStr(r.categoria)),
+    description: cellStr(r.descripcion) || "",
+    date: cellStr(r.fecha) || null,
+    amount: Number(cellNum(r.monto)) || 0,
+  }));
 
-  const expenses = readSheet(wb, "Gastos", ["categoria", "descripcion", "fecha", "monto"]).map(
-    (r) => ({
-      category: labelToCat(cellStr(r.categoria)),
-      description: cellStr(r.descripcion) || "",
-      date: cellStr(r.fecha) || null,
-      amount: Number(cellNum(r.monto)) || 0,
-    })
-  );
+  const { routeCosts, weeks } = parsePasajesSheet(wb.getWorksheet("Pasajes"));
 
-  const routeCosts = readSheet(wb, "PasajesCostos", ["rutaclave", "rutanombre", "costo"]).map(
-    (r) => ({
-      routeKey: cellStr(r.rutaclave),
-      label: cellStr(r.rutanombre) || cellStr(r.rutaclave),
-      cost: Number(cellNum(r.costo)) || 0,
-    })
-  );
-
-  // Pasajes: reconstruir semanas -> días -> marcas.
-  const useRows = readSheet(wb, "PasajesUso", [
-    "ordensemana",
-    "semana",
-    "inicio",
-    "fin",
-    "ordendia",
-    "dia",
-    "rutaclave",
-    "usado",
-  ]);
-  const weeksMap = new Map();
-  useRows.forEach((r) => {
-    const wKey = String(cellNum(r.ordensemana) ?? cellStr(r.semana));
-    if (!weeksMap.has(wKey)) {
-      weeksMap.set(wKey, {
-        orderIndex: Number(cellNum(r.ordensemana)) || weeksMap.size,
-        label: cellStr(r.semana) || `Semana ${weeksMap.size + 1}`,
-        startDate: cellStr(r.inicio) || null,
-        endDate: cellStr(r.fin) || null,
-        days: new Map(),
-      });
-    }
-    const week = weeksMap.get(wKey);
-    const dKey = String(cellNum(r.ordendia) ?? cellStr(r.dia));
-    if (!week.days.has(dKey)) {
-      week.days.set(dKey, {
-        orderIndex: Number(cellNum(r.ordendia)) || week.days.size,
-        label: cellStr(r.dia) || `Día ${week.days.size + 1}`,
-        marks: [],
-      });
-    }
-    const day = week.days.get(dKey);
-    const rk = cellStr(r.rutaclave);
-    const used = Number(cellNum(r.usado)) === 1;
-    if (rk && used) day.marks.push({ routeKey: rk, used: true });
-  });
-
-  const weeks = Array.from(weeksMap.values())
-    .sort((a, b) => a.orderIndex - b.orderIndex)
-    .map((w) => ({
-      label: w.label,
-      startDate: w.startDate,
-      endDate: w.endDate,
-      orderIndex: w.orderIndex,
-      days: Array.from(w.days.values())
-        .sort((a, b) => a.orderIndex - b.orderIndex)
-        .map((d) => ({ label: d.label, orderIndex: d.orderIndex, marks: d.marks })),
-    }));
-
-  return {
-    label,
-    startDate,
-    endDate,
-    transitDiscount,
-    incomes,
-    subscriptions,
-    expenses,
-    routeCosts,
-    weeks,
-  };
+  return { label, startDate, endDate, transitDiscount, incomes, subscriptions, expenses, routeCosts, weeks };
 }
 
-// ---------- helpers de lectura ----------
-function cellText(cell) {
-  const v = cell.value;
-  return v === null || v === undefined ? "" : String(v.text ?? v).trim();
+// Lee la hoja "Pasajes": tabla de costos + grillas semanales.
+function parsePasajesSheet(ws) {
+  if (!ws) return { routeCosts: [], weeks: [] };
+  const maxRow = ws.rowCount;
+  const maxCol = Math.max(ws.columnCount, 12);
+
+  // 1) Tabla de costos
+  const routeCosts = [];
+  const labelToKey = {};
+  let costHeaderRow = null;
+  for (let i = 1; i <= maxRow; i++) {
+    const row = ws.getRow(i);
+    const c1 = cellStr(row.getCell(1).value).toLowerCase();
+    if (c1 === "rutaclave") {
+      costHeaderRow = i;
+      break;
+    }
+  }
+  if (costHeaderRow) {
+    for (let i = costHeaderRow + 1; i <= maxRow; i++) {
+      const row = ws.getRow(i);
+      const key = cellStr(row.getCell(1).value);
+      if (!key) break;
+      const label = cellStr(row.getCell(2).value) || key;
+      const cost = Number(cellNum(row.getCell(3).value)) || 0;
+      routeCosts.push({ routeKey: key, label, cost });
+      labelToKey[label.toLowerCase()] = key;
+    }
+  }
+
+  // 2) Grillas semanales
+  const weeks = [];
+  let i = 1;
+  while (i <= maxRow) {
+    const row = ws.getRow(i);
+    // ¿es fila de encabezado de semana? busca "Total" en col >= 3
+    let totalCol = null;
+    for (let c = 3; c <= maxCol; c++) {
+      if (cellStr(row.getCell(c).value).toLowerCase() === "total") {
+        totalCol = c;
+        break;
+      }
+    }
+    // la fila siguiente debe empezar con una ruta conocida (col 2)
+    const nextLabel = cellStr(ws.getRow(i + 1).getCell(2).value).toLowerCase();
+    if (totalCol && labelToKey[nextLabel]) {
+      // días
+      const days = [];
+      for (let c = 3; c < totalCol; c++) {
+        const lbl = cellStr(row.getCell(c).value);
+        days.push({ colIndex: c, label: lbl || `Día ${c - 2}`, marks: [] });
+      }
+      // título/fechas: fila de arriba
+      const titleRow = ws.getRow(i - 1);
+      const weekLabel = cellStr(titleRow.getCell(1).value) || `Semana ${weeks.length + 1}`;
+      const startDate = cellStr(titleRow.getCell(4).value) || null;
+      const endDate = cellStr(titleRow.getCell(6).value) || null;
+
+      // filas de ruta
+      let rr = i + 1;
+      while (rr <= maxRow) {
+        const rrow = ws.getRow(rr);
+        const rlabel = cellStr(rrow.getCell(2).value).toLowerCase();
+        const routeKey = labelToKey[rlabel];
+        if (!routeKey) break;
+        days.forEach((d) => {
+          const v = rrow.getCell(d.colIndex).value;
+          if (Number(cellNum(v)) > 0) d.marks.push({ routeKey, used: true });
+        });
+        rr++;
+      }
+
+      weeks.push({
+        label: weekLabel,
+        startDate,
+        endDate,
+        orderIndex: weeks.length,
+        days: days.map((d, idx) => ({ label: d.label, orderIndex: idx, marks: d.marks })),
+      });
+      i = rr;
+    } else {
+      i++;
+    }
+  }
+
+  return { routeCosts, weeks };
 }
+
+// ---- helpers de lectura ----
 function cellStr(v) {
   if (v === null || v === undefined) return "";
   if (typeof v === "object") {
     if (v.text !== undefined) return String(v.text).trim();
     if (v.result !== undefined) return String(v.result).trim();
     if (v instanceof Date) return v.toISOString().slice(0, 10);
+    if (v.formula) return "";
   }
   return String(v).trim();
 }
 function cellNum(v) {
   if (v === null || v === undefined || v === "") return 0;
-  if (typeof v === "object" && v.result !== undefined) return v.result;
+  if (typeof v === "object") {
+    if (v.result !== undefined) return v.result;
+    if (v.formula !== undefined) return 0;
+  }
   return v;
 }
-
-// Lee una hoja como array de objetos, mapeando por nombre de encabezado (normalizado).
 function readSheet(wb, name, expectedHeaders) {
   const ws = wb.getWorksheet(name);
   if (!ws) return [];

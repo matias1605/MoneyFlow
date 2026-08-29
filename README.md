@@ -71,17 +71,24 @@ Moneyflow/
 
 En la barra lateral (tarjeta **Excel**):
 
-- **Exportar este periodo** — baja un `.xlsx` con todo el detalle del periodo actual
-  (ingresos, pasajes, suscripciones, gastos, costos de ruta y resumen). Este archivo es de
-  **ida y vuelta**: podés editarlo y volver a importarlo.
-- **Exportar todos (resumen)** — baja un `.xlsx` con una fila por periodo y sus totales
-  (ingresos, gastos, saldo y desglose por categoría). Ideal para respaldo y análisis.
-- **Importar periodo** — subís un `.xlsx` con el formato que exporta Moneyflow y crea un
-  periodo nuevo con esos datos.
+- **Guardar este periodo** — genera un `.xlsx` profesional del periodo actual y lo guarda en
+  disco. El archivo tiene grillas semanales (rutas × días con colores), tablas de ingresos,
+  suscripciones y gastos, y un bloque de resumen. Es de **ida y vuelta**: podés editarlo y
+  volver a importarlo.
+- **Guardar todos (resumen)** — guarda un `.xlsx` con una fila por periodo y sus totales
+  (ingresos, gastos, saldo y desglose por categoría), con fila de totales.
+- **Importar periodo** — subís un `.xlsx` con el formato de Moneyflow y crea un periodo nuevo.
 
-> La importación espera el formato propio de Moneyflow (las hojas `Periodo`, `Ingresos`,
-> `Suscripciones`, `Gastos`, `PasajesCostos`, `PasajesUso`). La forma más segura de obtenerlo
-> es exportar un periodo, editarlo y volver a subirlo.
+### ¿Dónde se guardan?
+
+En `C:\Users\Matias\Documents\Moneyflowexcels` por defecto. Se puede cambiar con la variable
+`EXPORT_DIR` en `backend/.env`. La carpeta se crea sola si no existe.
+
+### Formato del archivo (hojas)
+
+`Periodo` (meta + resumen), `Ingresos`, `Suscripciones`, `Gastos` y `Pasajes` (tabla de costos
+por ruta + grillas semanales). La importación lee este mismo formato, así que lo más seguro es
+guardar un periodo, editarlo y volver a subirlo.
 
 ## Modelo de datos
 
