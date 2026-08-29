@@ -90,6 +90,28 @@ En `C:\Users\Matias\Documents\Moneyflowexcels` por defecto. Se puede cambiar con
 por ruta + grillas semanales). La importación lee este mismo formato, así que lo más seguro es
 guardar un periodo, editarlo y volver a subirlo.
 
+## Desplegar en Render (opcional)
+
+La app puede correr en la nube como **un solo Web Service** (el backend sirve el frontend
+compilado y la API). La base de datos es un PostgreSQL externo (recomendado: **Neon**, gratis y
+persistente).
+
+> Sin login, la app queda **pública**: cualquiera con la URL puede ver y editar los datos.
+
+**Pasos resumidos:**
+
+1. **Base de datos (Neon):** crear un proyecto en [neon.tech](https://neon.tech), copiar la
+   *connection string* (empieza con `postgresql://...` e incluye `?sslmode=require`).
+2. **Render:** crear un **Blueprint** apuntando al repo (usa `render.yaml`), o un **Web Service**
+   manual con:
+   - Build Command: `npm run render-build`
+   - Start Command: `npm start`
+3. **Variable de entorno** en Render: `DATABASE_URL` = la connection string de Neon.
+4. Render compila, aplica las migraciones (`prisma migrate deploy`) y levanta el servicio.
+
+En la nube, la exportación de Excel funciona por **descarga** (el disco de Render es temporal).
+Localmente sigue guardando en la carpeta `Moneyflowexcels`.
+
 ## Modelo de datos
 
 - **Period** — un periodo con fechas editables (no es un mes calendario; ej. 31 ago – 25 sep).

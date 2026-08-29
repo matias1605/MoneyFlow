@@ -1,0 +1,16 @@
+# Blueprint de Render para Moneyflow.
+# Un solo Web Service (Node) que sirve el frontend compilado y la API.
+# La base de datos es externa (Neon): la cadena de conexión se carga como
+# variable de entorno DATABASE_URL en el panel de Render (no se define acá).
+services:
+  - type: web
+    name: moneyflow
+    runtime: node
+    plan: free
+    buildCommand: npm run render-build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false # se completa manualmente en el panel con la URL de Neon

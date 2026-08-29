@@ -2,6 +2,9 @@ import "dotenv/config";
 import express from "express";
 import "express-async-errors"; // hace que los errores async lleguen al middleware de error
 import cors from "cors";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
 
 import periods from "./routes/periods.js";
 import incomes from "./routes/incomes.js";
@@ -11,6 +14,7 @@ import transit from "./routes/transit.js";
 import excelRoutes from "./routes/excelRoutes.js";
 
 const app = express();
+app.disable("x-powered-by");
 app.use(cors());
 app.use(express.json());
 
@@ -24,6 +28,18 @@ app.use("/api", subscriptions);
 app.use("/api", expenses);
 app.use("/api", transit);
 app.use("/api", excelRoutes);
+
+// En producción (Render), el backend sirve también el frontend ya compilado.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const distPath = path.resolve(__dirname, "../../frontend/dist");
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+  // Cualquier ruta que no sea /api devuelve el index.html (SPA).
+  app.get("*", (req, res, next) => {
+    if (req.path.startsWith("/api")) return next();
+    res.sendFile(path.join(distPath, "index.html"));
+  });
+}
 
 // Manejo de errores centralizado: Prisma "no encontrado" -> 404, resto -> 500.
 app.use((err, _req, res, _next) => {

@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { api } from "./api.js";
+import { api, downloadFile } from "./api.js";
 import { computeSummary } from "./lib/format.js";
+
+// En local guardamos el Excel en la carpeta del disco; en la nube (Render) el
+// disco es temporal, así que exportamos por descarga del navegador.
+function isLocalHost() {
+  const h = window.location.hostname;
+  return h === "localhost" || h === "127.0.0.1";
+}
 
 import MonthNav from "./components/MonthNav.jsx";
 import StatsStrip from "./components/StatsStrip.jsx";
@@ -262,19 +269,27 @@ export default function App() {
 
   // ---- Excel ----
   async function savePeriodExcel() {
-    const r = await api.savePeriodExcel(currentId);
-    return r.path;
+    if (isLocalHost()) {
+      const r = await api.savePeriodExcel(currentId);
+      return "Guardado en: " + r.path;
+    }
+    downloadFile(api.exportPeriodUrl(currentId));
+    return "Descarga iniciada.";
   }
   async function saveAllExcel() {
-    const r = await api.saveAllExcel();
-    return r.path;
+    if (isLocalHost()) {
+      const r = await api.saveAllExcel();
+      return "Guardado en: " + r.path;
+    }
+    downloadFile(api.exportAllUrl());
+    return "Descarga iniciada.";
   }
   async function importExcel(file) {
     const created = await api.importExcel(file);
     await refreshList();
     setPeriod(created);
     setCurrentId(created.id);
-    return created.label;
+    return "Importado: " + created.label;
   }
 
   if (loading) {
