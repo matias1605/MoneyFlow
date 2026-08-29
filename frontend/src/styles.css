@@ -133,6 +133,11 @@ details.route-costs[open] summary:before { transform: rotate(90deg); }
 .cost-grid label { display: flex; flex-direction: column; gap: 3px; font-size: 0.72rem; color: var(--ink-faint); }
 .cost-grid input { border: 1px solid var(--border); background: var(--bg); border-radius: 7px; padding: 5px 6px; font-family: var(--font-mono); }
 
+.route-cost-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.route-cost-row { display: flex; align-items: center; gap: 8px; }
+.route-cost-row input[type="text"] { flex: 1; min-width: 0; border: 1px solid var(--border); background: var(--bg); border-radius: 7px; padding: 5px 8px; font-size: 0.85rem; }
+.route-cost-row input[type="number"] { width: 80px; border: 1px solid var(--border); background: var(--bg); border-radius: 7px; padding: 5px 6px; text-align: right; font-family: var(--font-mono); }
+
 .week-block { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; background: var(--bg); }
 .week-block-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .week-block-head input[type="text"] { font-family: var(--font-display); font-weight: 600; font-size: 1rem; border: none; background: transparent; flex: 1; min-width: 100px; }

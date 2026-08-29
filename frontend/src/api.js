@@ -46,6 +46,9 @@ export const api = {
   // Pasajes
   updateRouteCosts: (periodId, routeCosts) =>
     req("PUT", `/api/periods/${periodId}/route-costs`, { routeCosts }),
+  addRoute: (periodId, data) => req("POST", `/api/periods/${periodId}/routes`, data || {}),
+  updateRoute: (id, data) => req("PUT", `/api/routes/${id}`, data),
+  deleteRoute: (id) => req("DELETE", `/api/routes/${id}`),
   addWeek: (periodId, data) => req("POST", `/api/periods/${periodId}/weeks`, data || {}),
   updateWeek: (id, data) => req("PUT", `/api/weeks/${id}`, data),
   deleteWeek: (id) => req("DELETE", `/api/weeks/${id}`),

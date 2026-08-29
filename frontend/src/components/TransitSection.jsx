@@ -8,7 +8,9 @@ function dayUses(day, routeKey) {
 export default function TransitSection({
   period,
   pasajesTotal,
-  onRouteCostChange,
+  onUpdateRoute,
+  onAddRoute,
+  onDeleteRoute,
   onAddWeek,
   onUpdateWeek,
   onDeleteWeek,
@@ -30,20 +32,32 @@ export default function TransitSection({
       </div>
 
       <details className="route-costs">
-        <summary>Costos por ruta</summary>
-        <div className="cost-grid">
+        <summary>Rutas y costos</summary>
+        <div className="route-cost-list">
           {routes.map((r) => (
-            <label key={r.routeKey}>
-              {r.label}
+            <div className="route-cost-row" key={r.id}>
+              <input
+                type="text"
+                value={r.label}
+                onChange={(e) => onUpdateRoute(r.id, { label: e.target.value })}
+                aria-label="Nombre de la ruta"
+              />
               <input
                 type="number"
                 step="0.01"
                 value={r.cost}
-                onChange={(e) => onRouteCostChange(r.routeKey, { cost: e.target.value })}
+                onChange={(e) => onUpdateRoute(r.id, { cost: e.target.value })}
+                aria-label="Costo"
               />
-            </label>
+              <button className="row-del" onClick={() => onDeleteRoute(r.id)} aria-label="Eliminar ruta">
+                ✕
+              </button>
+            </div>
           ))}
         </div>
+        <button className="add-line" onClick={onAddRoute}>
+          + agregar ruta
+        </button>
       </details>
 
       {period.weeks.map((week) => (

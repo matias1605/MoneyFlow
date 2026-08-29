@@ -201,25 +201,40 @@ export default function App() {
     api.deleteExpense(id).catch(fail);
   }
 
-  // ---- Pasajes ----
-  function updateRouteCost(routeKey, patch) {
+  // ---- Pasajes: rutas ----
+  function updateRoute(routeId, patch) {
+    patchPeriod((p) => ({
+      ...p,
+      routeCosts: p.routeCosts.map((rc) => (rc.id === routeId ? { ...rc, ...patch } : rc)),
+    }));
+    api.updateRoute(routeId, patch).catch(fail);
+  }
+  async function addRoute() {
+    try {
+      const rc = await api.addRoute(currentId, { label: "Nueva ruta", cost: 0 });
+      patchPeriod((p) => ({ ...p, routeCosts: [...p.routeCosts, rc] }));
+    } catch (e) {
+      fail(e);
+    }
+  }
+  function deleteRoute(routeId) {
     patchPeriod((p) => {
-      const routeCosts = p.routeCosts.map((rc) =>
-        rc.routeKey === routeKey ? { ...rc, ...patch } : rc
-      );
-      // Persistimos la lista completa (el endpoint hace upsert).
-      api
-        .updateRouteCosts(
-          currentId,
-          routeCosts.map((rc) => ({
-            routeKey: rc.routeKey,
-            label: rc.label,
-            cost: Number(rc.cost) || 0,
-          }))
-        )
-        .catch(fail);
-      return { ...p, routeCosts };
+      const rc = p.routeCosts.find((x) => x.id === routeId);
+      const key = rc && rc.routeKey;
+      return {
+        ...p,
+        routeCosts: p.routeCosts.filter((x) => x.id !== routeId),
+        // saca las marcas de esa ruta para que el total recalcule al instante
+        weeks: p.weeks.map((w) => ({
+          ...w,
+          days: w.days.map((d) => ({
+            ...d,
+            marks: (d.marks || []).filter((m) => m.routeKey !== key),
+          })),
+        })),
+      };
     });
+    api.deleteRoute(routeId).catch(fail);
   }
   async function addWeek() {
     try {
@@ -336,7 +351,9 @@ export default function App() {
               <TransitSection
                 period={period}
                 pasajesTotal={pasajesTotal}
-                onRouteCostChange={updateRouteCost}
+                onUpdateRoute={updateRoute}
+                onAddRoute={addRoute}
+                onDeleteRoute={deleteRoute}
                 onAddWeek={addWeek}
                 onUpdateWeek={updateWeek}
                 onDeleteWeek={deleteWeek}

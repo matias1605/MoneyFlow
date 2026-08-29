@@ -30,6 +30,39 @@ router.put("/periods/:id/route-costs", async (req, res) => {
   res.json(routeCosts.map((rc) => ({ id: rc.id, routeKey: rc.routeKey, label: rc.label, cost: toNum(rc.cost) })));
 });
 
+// POST /api/periods/:id/routes  -> agrega una ruta al periodo
+router.post("/periods/:id/routes", async (req, res) => {
+  const periodId = Number(req.params.id);
+  const { label, cost } = req.body || {};
+  const routeKey = "r_" + Math.random().toString(36).slice(2, 9);
+  const rc = await prisma.routeCost.create({
+    data: { periodId, routeKey, label: label || "Nueva ruta", cost: Number(cost) || 0 },
+  });
+  res.status(201).json({ id: rc.id, routeKey: rc.routeKey, label: rc.label, cost: toNum(rc.cost) });
+});
+
+// PUT /api/routes/:id  -> edita nombre / costo de una ruta
+router.put("/routes/:id", async (req, res) => {
+  const { label, cost } = req.body || {};
+  const data = {};
+  if (label !== undefined) data.label = label;
+  if (cost !== undefined) data.cost = Number(cost) || 0;
+  const rc = await prisma.routeCost.update({ where: { id: Number(req.params.id) }, data });
+  res.json({ id: rc.id, routeKey: rc.routeKey, label: rc.label, cost: toNum(rc.cost) });
+});
+
+// DELETE /api/routes/:id  -> elimina una ruta y sus marcas asociadas en el periodo
+router.delete("/routes/:id", async (req, res) => {
+  const rc = await prisma.routeCost.findUnique({ where: { id: Number(req.params.id) } });
+  if (rc) {
+    await prisma.transitMark.deleteMany({
+      where: { routeKey: rc.routeKey, day: { week: { periodId: rc.periodId } } },
+    });
+    await prisma.routeCost.delete({ where: { id: rc.id } });
+  }
+  res.status(204).end();
+});
+
 // POST /api/periods/:id/weeks  -> crea una semana con días por defecto (L-V)
 router.post("/periods/:id/weeks", async (req, res) => {
   const periodId = Number(req.params.id);
