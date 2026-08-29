@@ -173,5 +173,9 @@ table.week-table tfoot td { font-family: var(--font-mono); font-weight: 600; bor
 
 footer.foot { text-align: center; color: var(--ink-faint); font-size: 0.78rem; margin-top: 30px; }
 
+.data-tools { display: flex; flex-direction: column; gap: 8px; }
+.data-tools .icon-btn { text-align: left; padding: 9px 12px; }
+.data-msg { margin-top: 10px; font-size: 0.8rem; color: var(--ink-soft); background: var(--surface-2); border-radius: 8px; padding: 7px 10px; word-break: break-word; }
+
 .loading-screen { display: grid; place-items: center; min-height: 60vh; color: var(--ink-faint); font-family: var(--font-display); font-size: 1.1rem; }
 .error-banner { background: var(--bad); color: #fff; padding: 10px 16px; border-radius: 10px; margin-bottom: 16px; font-size: 0.88rem; }

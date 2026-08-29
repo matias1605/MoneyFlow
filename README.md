@@ -67,6 +67,22 @@ Moneyflow/
    - Frontend: http://localhost:5173
    - API: http://localhost:3001/api
 
+## Importar / Exportar Excel
+
+En la barra lateral (tarjeta **Excel**):
+
+- **Exportar este periodo** — baja un `.xlsx` con todo el detalle del periodo actual
+  (ingresos, pasajes, suscripciones, gastos, costos de ruta y resumen). Este archivo es de
+  **ida y vuelta**: podés editarlo y volver a importarlo.
+- **Exportar todos (resumen)** — baja un `.xlsx` con una fila por periodo y sus totales
+  (ingresos, gastos, saldo y desglose por categoría). Ideal para respaldo y análisis.
+- **Importar periodo** — subís un `.xlsx` con el formato que exporta Moneyflow y crea un
+  periodo nuevo con esos datos.
+
+> La importación espera el formato propio de Moneyflow (las hojas `Periodo`, `Ingresos`,
+> `Suscripciones`, `Gastos`, `PasajesCostos`, `PasajesUso`). La forma más segura de obtenerlo
+> es exportar un periodo, editarlo y volver a subirlo.
+
 ## Modelo de datos
 
 - **Period** — un periodo con fechas editables (no es un mes calendario; ej. 31 ago – 25 sep).

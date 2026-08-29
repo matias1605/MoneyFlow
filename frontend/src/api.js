@@ -53,4 +53,33 @@ export const api = {
   updateDay: (id, data) => req("PUT", `/api/days/${id}`, data),
   deleteDay: (id) => req("DELETE", `/api/days/${id}`),
   setMark: (dayId, routeKey, used) => req("PUT", "/api/marks", { dayId, routeKey, used }),
+
+  // Excel
+  exportPeriodUrl: (id) => `/api/periods/${id}/export`,
+  exportAllUrl: () => `/api/export`,
+  importExcel: async (file) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch("/api/import", { method: "POST", body: form });
+    if (!res.ok) {
+      let detail = "";
+      try {
+        detail = (await res.json()).error || "";
+      } catch (e) {
+        /* ignore */
+      }
+      throw new Error(detail || `Error ${res.status}`);
+    }
+    return res.json();
+  },
 };
+
+// Dispara la descarga de un archivo desde una URL (respuesta con attachment).
+export function downloadFile(url) {
+  const a = document.createElement("a");
+  a.href = url;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}

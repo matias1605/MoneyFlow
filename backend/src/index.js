@@ -8,6 +8,7 @@ import incomes from "./routes/incomes.js";
 import subscriptions from "./routes/subscriptions.js";
 import expenses from "./routes/expenses.js";
 import transit from "./routes/transit.js";
+import excelRoutes from "./routes/excelRoutes.js";
 
 const app = express();
 app.use(cors());
@@ -22,6 +23,7 @@ app.use("/api", incomes);
 app.use("/api", subscriptions);
 app.use("/api", expenses);
 app.use("/api", transit);
+app.use("/api", excelRoutes);
 
 // Manejo de errores centralizado: Prisma "no encontrado" -> 404, resto -> 500.
 app.use((err, _req, res, _next) => {

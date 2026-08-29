@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api } from "./api.js";
+import { api, downloadFile } from "./api.js";
 import { computeSummary } from "./lib/format.js";
 
 import MonthNav from "./components/MonthNav.jsx";
@@ -10,6 +10,7 @@ import SubscriptionsSection from "./components/SubscriptionsSection.jsx";
 import ExpensesSection from "./components/ExpensesSection.jsx";
 import CategorySummary from "./components/CategorySummary.jsx";
 import HistoryPanel from "./components/HistoryPanel.jsx";
+import DataTools from "./components/DataTools.jsx";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -259,6 +260,21 @@ export default function App() {
     api.setMark(dayId, routeKey, used).catch(fail);
   }
 
+  // ---- Excel ----
+  function exportPeriod() {
+    if (currentId) downloadFile(api.exportPeriodUrl(currentId));
+  }
+  function exportAll() {
+    downloadFile(api.exportAllUrl());
+  }
+  async function importExcel(file) {
+    const created = await api.importExcel(file);
+    await refreshList();
+    setPeriod(created);
+    setCurrentId(created.id);
+    return created.label;
+  }
+
   if (loading) {
     return <div className="loading-screen">Cargando Moneyflow…</div>;
   }
@@ -333,6 +349,11 @@ export default function App() {
                 currentId={currentId}
                 liveSummary={summary}
                 onSelect={openPeriod}
+              />
+              <DataTools
+                onExportPeriod={exportPeriod}
+                onExportAll={exportAll}
+                onImport={importExcel}
               />
             </div>
           </div>
