@@ -1,11 +1,11 @@
 :root {
-  --bg: #eef1ec;
+  --bg: #f6f8f3;
   --surface: #ffffff;
-  --surface-2: #e3e8de;
-  --ink: #1f2620;
-  --ink-soft: #57635a;
-  --ink-faint: #7c887e;
-  --border: #d2d9cb;
+  --surface-2: #eef2ea;
+  --ink: #263028;
+  --ink-soft: #5b6960;
+  --ink-faint: #8a968c;
+  --border: #e4eade;
   --accent: #1f6f5c;
   --accent-soft: #d9ece6;
   --transit: #35578c;
@@ -151,6 +151,14 @@ table.week-table th { color: var(--ink-faint); font-weight: 500; }
 table.week-table th.route-name, table.week-table td.route-name { text-align: left; color: var(--ink-soft); white-space: nowrap; }
 table.week-table th input[type="text"] { width: 78px; border: none; background: transparent; text-align: center; font-size: 0.78rem; border-bottom: 1px dashed var(--border); }
 table.week-table td input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--transit); cursor: pointer; }
+.day-head { display: flex; align-items: center; gap: 2px; justify-content: center; }
+.day-del { border: none; background: none; color: var(--ink-faint); cursor: pointer; font-size: 0.7rem; padding: 0 2px; line-height: 1; }
+.day-del:hover { color: var(--bad); }
+
+.split-line { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.78rem; font-family: var(--font-mono); margin-top: 8px; }
+.split-line.month { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 0.84rem; }
+.split-tren { color: var(--transit); font-weight: 600; }
+.split-otras { color: var(--accent); font-weight: 600; }
 table.week-table tfoot td { font-family: var(--font-mono); font-weight: 600; border-top: 1px solid var(--border); padding-top: 7px; }
 .week-actions { display: flex; gap: 8px; margin-top: 8px; }
 .week-actions button { font-size: 0.72rem; }

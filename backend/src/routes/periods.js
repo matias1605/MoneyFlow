@@ -80,12 +80,13 @@ router.get("/periods/:id", async (req, res) => {
 
 // PUT /api/periods/:id  -> edita label / fechas / descuento
 router.put("/periods/:id", async (req, res) => {
-  const { label, startDate, endDate, transitDiscount } = req.body || {};
+  const { label, startDate, endDate, transitDiscount, saldoInicial } = req.body || {};
   const data = {};
   if (label !== undefined) data.label = label;
   if (startDate !== undefined) data.startDate = parseDate(startDate) || undefined;
   if (endDate !== undefined) data.endDate = parseDate(endDate) || undefined;
   if (transitDiscount !== undefined) data.transitDiscount = Number(transitDiscount) || 0;
+  if (saldoInicial !== undefined) data.saldoInicial = Number(saldoInicial) || 0;
 
   const updated = await prisma.period.update({
     where: { id: Number(req.params.id) },

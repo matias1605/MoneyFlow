@@ -58,6 +58,7 @@ export function serializePeriod(p) {
     label: p.label,
     startDate: dateStr(p.startDate),
     endDate: dateStr(p.endDate),
+    saldoInicial: toNum(p.saldoInicial),
     transitDiscount: toNum(p.transitDiscount),
     incomes: (p.incomes || []).map((i) => ({
       id: i.id,
@@ -134,10 +135,12 @@ export function computeSummary(p, routeCostMap) {
   });
 
   const gastos = Object.values(byCat).reduce((a, v) => a + v, 0);
+  const saldoInicial = toNum(p.saldoInicial);
   return {
+    saldoInicial: round2(saldoInicial),
     ingresos: round2(ingresos),
     gastos: round2(gastos),
-    saldo: round2(ingresos - gastos),
+    saldo: round2(saldoInicial + ingresos - gastos),
     byCat: Object.fromEntries(
       Object.entries(byCat).map(([k, v]) => [k, round2(v)])
     ),

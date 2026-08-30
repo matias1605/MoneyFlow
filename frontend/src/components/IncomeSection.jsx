@@ -1,4 +1,11 @@
-export default function IncomeSection({ incomes, onAdd, onUpdate, onDelete }) {
+export default function IncomeSection({
+  incomes,
+  saldoInicial,
+  onSaldoInicialChange,
+  onAdd,
+  onUpdate,
+  onDelete,
+}) {
   return (
     <div className="card">
       <div className="card-head">
@@ -6,6 +13,19 @@ export default function IncomeSection({ incomes, onAdd, onUpdate, onDelete }) {
           <h2>Ingresos <span className="chip">quincenas</span></h2>
           <div className="sub">cada pago de sueldo, con su monto (puede variar)</div>
         </div>
+      </div>
+
+      <div className="field-inline" style={{ borderBottom: "1px solid var(--border)", paddingBottom: "10px", marginBottom: "6px" }}>
+        <label>
+          Saldo inicial <span style={{ color: "var(--ink-faint)" }}>(lo que traés del periodo anterior)</span>
+        </label>
+        <input
+          type="number"
+          step="0.01"
+          value={saldoInicial}
+          onChange={(e) => onSaldoInicialChange(e.target.value)}
+          aria-label="Saldo inicial"
+        />
       </div>
 
       <div>

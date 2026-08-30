@@ -17,6 +17,7 @@ model Period {
   label           String
   startDate       DateTime       @db.Date
   endDate         DateTime       @db.Date
+  saldoInicial    Decimal        @default(0) @db.Decimal(10, 2)
   transitDiscount Decimal        @default(0) @db.Decimal(10, 2)
   createdAt       DateTime       @default(now())
 

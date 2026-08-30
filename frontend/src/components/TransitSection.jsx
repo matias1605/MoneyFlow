@@ -1,4 +1,4 @@
-import { money, weekTotal } from "../lib/format.js";
+import { money, weekTotal, splitTotals } from "../lib/format.js";
 
 function dayUses(day, routeKey) {
   const m = (day.marks || []).find((x) => x.routeKey === routeKey);
@@ -94,12 +94,22 @@ export default function TransitSection({
                   <th className="route-name"></th>
                   {week.days.map((day) => (
                     <th key={day.id}>
-                      <input
-                        type="text"
-                        value={day.label}
-                        onChange={(e) => onUpdateDay(day.id, { label: e.target.value })}
-                        aria-label="Nombre del día"
-                      />
+                      <div className="day-head">
+                        <input
+                          type="text"
+                          value={day.label}
+                          onChange={(e) => onUpdateDay(day.id, { label: e.target.value })}
+                          aria-label="Nombre del día"
+                        />
+                        <button
+                          className="day-del"
+                          onClick={() => onDeleteDay(day.id)}
+                          aria-label="Eliminar día"
+                          title="Eliminar día"
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </th>
                   ))}
                 </tr>
@@ -122,6 +132,11 @@ export default function TransitSection({
                 ))}
               </tbody>
             </table>
+          </div>
+
+          <div className="split-line">
+            <span className="split-tren">Tren: {money(splitTotals(period, week).tren)}</span>
+            <span className="split-otras">Otras rutas: {money(splitTotals(period, week).otras)}</span>
           </div>
 
           <div className="week-actions">
@@ -151,6 +166,11 @@ export default function TransitSection({
           value={period.transitDiscount}
           onChange={(e) => onDiscountChange(e.target.value)}
         />
+      </div>
+
+      <div className="split-line month">
+        <span className="split-tren">Tren (mes): {money(splitTotals(period).tren)}</span>
+        <span className="split-otras">Otras rutas (mes): {money(splitTotals(period).otras)}</span>
       </div>
 
       <div className="pasajes-footline">

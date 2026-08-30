@@ -18,10 +18,34 @@ const CAT_KEY = {
   OTROS: "otros",
 };
 
+// Rutas de tren (el resto se considera "otras rutas" / bus).
+export const TREN_KEYS = new Set(["trenIda", "trenVuelta"]);
+
+// Desglose de gasto tren vs. otras rutas. Si se pasa una semana, solo esa;
+// si no, todo el periodo.
+export function splitTotals(period, week) {
+  const costMap = {};
+  (period.routeCosts || []).forEach((rc) => {
+    costMap[rc.routeKey] = Number(rc.cost) || 0;
+  });
+  const days = week ? week.days || [] : (period.weeks || []).flatMap((w) => w.days || []);
+  let tren = 0;
+  let otras = 0;
+  days.forEach((d) => {
+    (d.marks || []).forEach((m) => {
+      if (!m.used) return;
+      const c = costMap[m.routeKey] || 0;
+      if (TREN_KEYS.has(m.routeKey)) tren += c;
+      else otras += c;
+    });
+  });
+  return { tren, otras, total: tren + otras };
+}
+
 // Calcula ingresos, gastos, saldo y desglose por categoría de un periodo.
 export function computeSummary(period) {
   if (!period) {
-    return { ingresos: 0, gastos: 0, saldo: 0, byCat: emptyByCat() };
+    return { saldoInicial: 0, ingresos: 0, gastos: 0, saldo: 0, byCat: emptyByCat() };
   }
   const costMap = {};
   (period.routeCosts || []).forEach((rc) => {
@@ -51,7 +75,8 @@ export function computeSummary(period) {
   });
 
   const gastos = Object.values(byCat).reduce((a, v) => a + v, 0);
-  return { ingresos, gastos, saldo: ingresos - gastos, byCat };
+  const saldoInicial = Number(period.saldoInicial) || 0;
+  return { saldoInicial, ingresos, gastos, saldo: saldoInicial + ingresos - gastos, byCat };
 }
 
 // Total de pasajes de una sola semana (para el encabezado de cada semana).

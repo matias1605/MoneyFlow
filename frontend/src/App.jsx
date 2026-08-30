@@ -137,6 +137,10 @@ export default function App() {
     patchPeriod((p) => ({ ...p, transitDiscount: value }));
     api.updatePeriod(currentId, { transitDiscount: Number(value) || 0 }).catch(fail);
   }
+  function handleSaldoInicialChange(value) {
+    patchPeriod((p) => ({ ...p, saldoInicial: value }));
+    api.updatePeriod(currentId, { saldoInicial: Number(value) || 0 }).catch(fail);
+  }
 
   // ---- Ingresos ----
   async function addIncome() {
@@ -344,6 +348,8 @@ export default function App() {
             <div className="col">
               <IncomeSection
                 incomes={period.incomes}
+                saldoInicial={period.saldoInicial}
+                onSaldoInicialChange={handleSaldoInicialChange}
                 onAdd={addIncome}
                 onUpdate={updateIncome}
                 onDelete={deleteIncome}
