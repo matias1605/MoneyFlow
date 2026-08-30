@@ -2,6 +2,8 @@ export default function IncomeSection({
   incomes,
   saldoInicial,
   onSaldoInicialChange,
+  onUseCarryover,
+  hasPrevious,
   onAdd,
   onUpdate,
   onDelete,
@@ -15,17 +17,29 @@ export default function IncomeSection({
         </div>
       </div>
 
-      <div className="field-inline" style={{ borderBottom: "1px solid var(--border)", paddingBottom: "10px", marginBottom: "6px" }}>
-        <label>
-          Saldo inicial <span style={{ color: "var(--ink-faint)" }}>(lo que traés del periodo anterior)</span>
-        </label>
-        <input
-          type="number"
-          step="0.01"
-          value={saldoInicial}
-          onChange={(e) => onSaldoInicialChange(e.target.value)}
-          aria-label="Saldo inicial"
-        />
+      <div style={{ borderBottom: "1px solid var(--border)", paddingBottom: "10px", marginBottom: "6px" }}>
+        <div className="field-inline">
+          <label>
+            Saldo inicial <span style={{ color: "var(--ink-faint)" }}>(lo que traés del periodo anterior)</span>
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            value={saldoInicial}
+            onChange={(e) => onSaldoInicialChange(e.target.value)}
+            aria-label="Saldo inicial"
+          />
+        </div>
+        {hasPrevious && (
+          <button
+            className="icon-btn"
+            style={{ marginTop: "6px" }}
+            onClick={onUseCarryover}
+            title="Traer el saldo disponible del periodo anterior"
+          >
+            ↻ usar sobrante del periodo anterior
+          </button>
+        )}
       </div>
 
       <div>

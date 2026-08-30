@@ -159,7 +159,9 @@ export default function TransitSection({
       </button>
 
       <div className="field-inline" style={{ marginTop: "10px" }}>
-        <label>Descuento / saldo a favor</label>
+        <label>
+          Saldo de tarjeta prepaga <span style={{ color: "var(--ink-faint)" }}>(tren/bus · resta a pasajes)</span>
+        </label>
         <input
           type="number"
           step="0.01"

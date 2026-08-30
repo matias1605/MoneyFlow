@@ -141,6 +141,18 @@ export default function App() {
     patchPeriod((p) => ({ ...p, saldoInicial: value }));
     api.updatePeriod(currentId, { saldoInicial: Number(value) || 0 }).catch(fail);
   }
+  // Llena el saldo inicial con el saldo disponible del periodo anterior.
+  async function useCarryover() {
+    const ids = periods.map((p) => p.id); // ordenados por startDate asc
+    const idx = ids.indexOf(currentId);
+    if (idx <= 0) return;
+    try {
+      const prev = await api.getPeriod(ids[idx - 1]);
+      handleSaldoInicialChange(prev.summary.saldo);
+    } catch (e) {
+      fail(e);
+    }
+  }
 
   // ---- Ingresos ----
   async function addIncome() {
@@ -350,6 +362,8 @@ export default function App() {
                 incomes={period.incomes}
                 saldoInicial={period.saldoInicial}
                 onSaldoInicialChange={handleSaldoInicialChange}
+                onUseCarryover={useCarryover}
+                hasPrevious={periods.map((p) => p.id).indexOf(currentId) > 0}
                 onAdd={addIncome}
                 onUpdate={updateIncome}
                 onDelete={deleteIncome}
